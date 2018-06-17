@@ -11,7 +11,7 @@
         },
         "virtualMachineSize": {
             "type": "string",
-            "defaultValue": "Standard DS2_v3"
+            "defaultValue": "Standard_DS2_v2"
         },
         "resourceGroupVNet":{
             "type": "string"
@@ -37,7 +37,7 @@
         "apiVersionNic": "2018-04-01"
     },
     "functions": [{
-        "namespace": "cbsp",
+        "namespace": "myFunctions",
         "members": {
             "vmName": {
                 "parameters": [{
