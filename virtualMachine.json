@@ -1,0 +1,168 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachineName": {
+            "type": "string"
+        },
+        "vmCount": {
+            "type": "int",
+            "defaultvalue": 2
+        },
+        "virtualMachineSize": {
+            "type": "string",
+            "defaultValue": "Standard DS2_v3"
+        },
+        "resourceGroupVNet":{
+            "type": "string"
+        },
+        "virtualNetworkName": {
+            "type": "string"
+        },
+        "subnetName": {
+            "type": "string"
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "adminPassword": {
+            "type": "securestring"
+        }
+    },
+    "variables": {
+        "vnetId": "[resourceId(parameters('resourceGroupVNet'), 'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
+        "location": "West Europe",
+        "apiVersionVM": "2017-03-30",
+        "apiVersionNic": "2018-04-01"
+    },
+    "functions": [{
+        "namespace": "cbsp",
+        "members": {
+            "vmName": {
+                "parameters": [{
+                        "name": "inputNameVM",
+                        "type": "string"
+                    },
+                    {
+                        "name": "indexvm",
+                        "type": "int"
+                    }
+                ],
+                "output": {
+                    "type": "string",
+                    "value": "[concat(toLower(parameters('inputNameVM')), padLeft(parameters('indexvm'),3,'0'))]"
+                }
+            },
+            "diskName": {
+                "parameters": [{
+                        "name": "inputNameDisk",
+                        "type": "string"
+                    },
+                    {
+                        "name": "indexdisk",
+                        "type": "int"
+                    }
+                ],
+                "output": {
+                    "type": "string",
+                    "value": "[concat(toLower(parameters('inputNameDisk')), padLeft(parameters('indexdisk'),3,'0'), '-osdisk')]"
+                }
+            },
+            "nicName": {
+                "parameters": [{
+                        "name": "inputNameNic",
+                        "type": "string"
+                    },
+                    {
+                        "name": "indexnic",
+                        "type": "int"
+                    }
+                ],
+                "output": {
+                    "type": "string",
+                    "value": "[concat(toLower(parameters('inputNameNic')), padLeft(parameters('indexnic'),3,'0'), '-nic')]"
+                }
+            }
+        }
+    }],
+    "resources": [
+        {
+            "name": "[myFunctions.vmName(parameters('virtualMachineName'),copyindex(1))]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "[variables('apiVersionVM')]",
+            "location": "[variables('location')]",
+            "copy": {
+                "name": "virtualMachineLoop",
+                "count": "[parameters('vmCount')]"
+            },
+            "dependsOn": [
+                "[myFunctions.nicName(parameters('virtualMachineName'),copyindex(1))]"
+            ],
+            "properties": {
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachineName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]",
+                    "windowsConfiguration": {
+                        "provisionVmAgent": "true"
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachineSize')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2016-Datacenter",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name":"[myFunctions.diskName(parameters('virtualMachineName'),copyindex(1))]",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                        }
+                    },
+                    "dataDisks": []
+                },
+                "networkProfile": {
+                    "networkInterfaces": [{
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', myFunctions.nicName(parameters('virtualMachineName'),copyindex(1)))]"
+                    }]
+                },
+                "licenseType": "Windows_Server"
+            }
+        },
+        {
+            "name": "[myFunctions.nicName(parameters('virtualMachineName'),copyindex(1))]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "[variables('apiVersionNic')]",
+            "location": "[variables('location')]",
+            "copy": {
+                "name": "NicLoop",
+                "count": "[parameters('vmCount')]"
+            },
+            "dependsOn": [
+            ],
+            "properties": {
+                "ipConfigurations": [{
+                    "name": "ipconfig1",
+                    "properties": {
+                        "subnet": {
+                            "id": "[variables('subnetRef')]"
+                        },
+                        "privateIPAllocationMethod": "Dynamic"
+                    }
+                }]
+            }
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        }
+    }
+}
