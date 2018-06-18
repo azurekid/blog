@@ -37,7 +37,7 @@
         "apiVersionNic": "2018-04-01"
     },
     "functions": [{
-        "namespace": "myFunction",
+        "namespace": "myFunctions",
         "members": {
             "vmName": {
                 "parameters": [{
