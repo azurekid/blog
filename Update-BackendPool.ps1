@@ -17,21 +17,45 @@ Param(
     [Parameter(Mandatory = $True)]
     [string]$debugDeploymentDebugLevel,
     [Parameter(Mandatory = $True)]
+    [string]$backendPoolName,
+    [Parameter(Mandatory = $False)]
     [string]$availabilitySetName,
-    [Parameter(Mandatory = $True)]
-    [string]$backendPoolName
+    [Parameter(Mandatory = $False)]
+    [array]$vmNames
 )
 
 $ErrorActionPreference = "Stop"
 
+function add-vmToLoadBalancer($object, $type, $backendPool) {
+    
+    if ($type -eq "avSet") {
+        ForEach ($id in $object.VirtualMachinesReferences.id) {
+            add-nicToBackendPool -id $id -backendPool $backendPool
+        }
+    }
+    
+    elseif ($type -eq "vm") {
+        add-nicToBackendPool -id $object.id -backendPool $backendPool
+    }
+    else {
+        Write-Warning "no virtual machines found to add to the backend pool"
+    }
+}    
+
+function add-nicToBackendPool($id, $backendPool) {
+    $nic = Get-AzureRmNetworkInterface | Where-Object {($_.VirtualMachine.id).ToLower() -eq ($id).ToLower()}
+    $nic.IpConfigurations[0].LoadBalancerBackendAddressPools = $backendPool
+
+    Set-AzureRmNetworkInterface -NetworkInterface $nic -AsJob
+}
+
 Try {
     $loadBalancer = Get-AzureRmLoadBalancer `
         -Name $loadBalancerName `
-        -ResourceGroupName $resourceGroupName `
-        -ErrorAction Stop
+        -ResourceGroupName $resourceGroupName
 }
 Catch {
-    Write-Warning "No Load Balancer found with name $loadBalancerName in resource group $resourceGroupName"
+    Write-Warning "No Load Balancer found with name: $loadBalancerName in resource group $resourceGroupName"
     Return
 }
 
@@ -41,29 +65,41 @@ try {
         -LoadBalancer $loadBalancer
 }
 catch {
-    #Write-Warning "no Backend Pool found with the name $backendPoolName in the load balancer with the name $loadBalancerName"
+    Write-Warning "no Backend Pool found with the name: $backendPoolName"
     Return
 }
 
 try {
-    $AvSet = Get-AzureRmAvailabilitySet `
-        -Name $availabilitySetName `
-        -ResourceGroupName (Get-AzureRmResource | Where-Object {
-            ($_.Name -eq $availabilitySetName) -and `
-            ($_.ResourceType -eq "Microsoft.Compute/AvailabilitySets")}).ResourceGroupName
+    if ($vmNames) {
+        foreach ($vmName in $vmNames) {
+            $vm = Get-AzureRmVM -Name $vmName `
+                -ResourceGroupName (Get-AzureRmResource | Where-Object {
+                    ($_.Name -eq $vmName) -and `
+                    ($_.ResourceType -eq "Microsoft.Compute/VirtualMachines")}).ResourceGroupName
+
+            add-vmToLoadBalancer -object $vm -type "vm" -backendPool $backendPool
+        }
+    }
 }
 catch {
-    Write-Warning "no AvailabilitySet found with the name $availabilitySetName in resource group $availabilitySetResourceGroup"
+    Write-Warning "no virtual machine found"
+}
+try {
+    if ($availabilitySetName) {
+        $AvSet = Get-AzureRmAvailabilitySet `
+            -Name $availabilitySetName `
+            -ResourceGroupName (Get-AzureRmResource | Where-Object {
+                ($_.Name -eq $availabilitySetName) -and `
+                ($_.ResourceType -eq "Microsoft.Compute/AvailabilitySets")}).ResourceGroupName
+                
+        Write-host "adding servers in AvSet $($AvSet.Name) to the load balancer"
+        add-vmToLoadBalancer -object $AvSet -type "avSet" -backendPool $backendPool
+    }
+}
+catch {
+    Write-Warning "no Availability Set found with the name: $availabilitySetName"
     Return
 }
-
-ForEach ($id in $avSet.VirtualMachinesReferences.id) {
-
-    $nic = Get-AzureRmNetworkInterface | Where-Object {($_.VirtualMachine.id).ToLower() -eq ($id).ToLower()}
-    $nic.IpConfigurations[0].LoadBalancerBackendAddressPools = $backendPool
-
-    Set-AzureRmNetworkInterface -NetworkInterface $nic -AsJob    
-}    
 
 If ($ErrorMessages) {
     Write-Error "Deployment returned the following errors: $ErrorMessages";
