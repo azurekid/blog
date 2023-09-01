@@ -1,5 +1,5 @@
 name: Analytics
-on: push
+on: [workflow_dispatch] #push
 
 jobs:
   pester-test:
