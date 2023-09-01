@@ -23,3 +23,8 @@ jobs:
              inlineScript: |
                Get-AzResourceGroup
              azPSVersion: "latest"
+
+        - name: Create annotation for build error
+          run: echo "::warning::Set the Octocat variable"
+             
+
