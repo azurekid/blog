@@ -25,6 +25,6 @@ jobs:
              azPSVersion: "latest"
 
         - name: Create annotation for build error
-          run: echo "::warning::Set the Octocat variable"
+          run: echo "::core.setFailed::Set the Octocat variable"
              
 
