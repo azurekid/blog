@@ -6,7 +6,7 @@ permissions:
       contents: read
       
 jobs: 
-  Windows-latest:
+  ubuntu-latest:
       runs-on: ubuntu-latest
       steps:
         - name: OIDC Login to Azure Public Cloud with AzPowershell (enableAzPSSession true)
@@ -33,6 +33,6 @@ jobs:
         - name: Create annotation for build error
           run: echo "::notice::Set the Octocat variable"
         - name: Create annotation for build error
-          run: exit 2 'this is an error!'
+          run: exit 2
              
 
