@@ -32,5 +32,7 @@ jobs:
           run: echo "::debug::Set the Octocat variable"
         - name: Create annotation for build error
           run: echo "::notice::Set the Octocat variable"
+        - name: Create annotation for build error
+          run: exit 1
              
 
